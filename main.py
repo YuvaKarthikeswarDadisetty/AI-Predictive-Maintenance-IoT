@@ -1,70 +1,233 @@
+# ============================================
+# AI-Powered Predictive Maintenance (FINAL)
+# NASA Dataset + ML + Visualizations + Prediction
+# ============================================
+
 import os
 import pandas as pd
 import numpy as np
+
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
-from src.data_loader import load_data
-from src.preprocess import preprocess_data
-from src.model import train_model
-from src.evaluate import evaluate_model
-from src.predict import predict_machine
-from src.visualize import save_confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# Generate dataset (optional)
-np.random.seed(42)
-n = 120
+# ============================================
+# STEP 1: LOAD NASA DATA
+# ============================================
 
-df = pd.DataFrame({
-    "temperature": np.random.randint(40, 95, n),
-    "vibration": np.round(np.random.uniform(0.01, 0.12, n), 3),
-    "pressure": np.random.randint(25, 75, n),
-    "humidity": np.random.randint(30, 65, n),
-    "runtime_hours": np.random.randint(50, 400, n)
-})
+def load_nasa_data(path):
+    df = pd.read_csv(path, sep=" ", header=None)
+    df = df.dropna(axis=1)
 
-df["failure"] = np.where(
-    (df["temperature"] > 75) &
-    (df["vibration"] > 0.08) &
-    (df["pressure"] > 55),
-    1, 0
-)
+    columns = ["engine_id", "cycle"] + [f"sensor_{i}" for i in range(1, df.shape[1]-1)]
+    df.columns = columns
 
-os.makedirs("data", exist_ok=True)
-df.to_csv("data/sensor_data.csv", index=False)
+    return df
 
-# Load
-df = load_data()
 
-# Preprocess
-X, y, scaler = preprocess_data(df)
+def add_rul(df):
+    max_cycle = df.groupby("engine_id")["cycle"].max().reset_index()
+    max_cycle.columns = ["engine_id", "max_cycle"]
 
-# Split
+    df = df.merge(max_cycle, on="engine_id")
+    df["RUL"] = df["max_cycle"] - df["cycle"]
+
+    return df
+
+
+def create_failure_label(df, threshold=30):
+    df["failure"] = np.where(df["RUL"] <= threshold, 1, 0)
+    return df
+
+
+def prepare_features(df):
+    df = df.drop(["engine_id", "cycle", "max_cycle", "RUL"], axis=1)
+
+    X = df.drop("failure", axis=1)
+    y = df["failure"]
+
+    return X, y
+
+
+# ============================================
+# LOAD DATASET
+# ============================================
+
+file_path = "data/nasa/train_FD001.txt"
+
+if not os.path.exists(file_path):
+    print("❌ ERROR: Dataset not found!")
+    print("Place it here: data/nasa/train_FD001.txt")
+    exit()
+
+df = load_nasa_data(file_path)
+
+print("✅ NASA Dataset Loaded")
+print(df.head())
+
+
+# ============================================
+# PREPROCESSING
+# ============================================
+
+df = add_rul(df)
+df = create_failure_label(df)
+
+X, y = prepare_features(df)
+
+# Scaling
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Train-test split
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
+    X_scaled, y, test_size=0.2, random_state=42
 )
 
-# Train
-model = train_model(X_train, y_train)
+print("\n✅ Preprocessing Completed")
+print("Train Shape:", X_train.shape)
+print("Test Shape:", X_test.shape)
 
-# Predict
+
+# ============================================
+# MODEL TRAINING
+# ============================================
+
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+print("\n🤖 Model Training Completed")
+
+
+# ============================================
+# PREDICTION
+# ============================================
+
 y_pred = model.predict(X_test)
 
-# Evaluate
-acc, report, cm = evaluate_model(y_test, y_pred)
+print("\n🔍 Sample Predictions:", y_pred[:10])
 
-print("\nAccuracy:", acc)
-print("\nReport:\n", report)
 
-# Save confusion matrix
-save_confusion_matrix(cm)
+# ============================================
+# EVALUATION
+# ============================================
 
-# Real-time prediction
-columns = df.drop("failure", axis=1).columns
+accuracy = accuracy_score(y_test, y_pred)
 
-print("\n🔧 Real-time Test:")
-prediction = predict_machine(model, scaler, [85, 0.1, 65, 55, 300], columns)
+print("\n📈 Accuracy:", accuracy)
 
-if prediction == 1:
-    print("🚨 Failure Likely")
-else:
-    print("✅ Healthy")
+print("\n📄 Classification Report:\n")
+print(classification_report(y_test, y_pred))
+
+
+# ============================================
+# CREATE IMAGES FOLDER
+# ============================================
+
+os.makedirs("images", exist_ok=True)
+
+
+# ============================================
+# CONFUSION MATRIX
+# ============================================
+
+cm = confusion_matrix(y_test, y_pred)
+
+plt.figure()
+sns.heatmap(cm, annot=True, fmt="d")
+plt.title("Confusion Matrix")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.savefig("images/confusion_matrix.png")
+plt.close()
+
+print("✅ Confusion matrix saved")
+
+
+# ============================================
+# VISUALIZATION (NASA → MAPPED FEATURES)
+# ============================================
+
+df_visual = df.copy()
+
+# Map sensors
+df_visual["temperature"] = df_visual["sensor_2"]
+df_visual["vibration"] = df_visual["sensor_3"]
+df_visual["pressure"] = df_visual["sensor_4"]
+df_visual["humidity"] = df_visual["sensor_7"]
+df_visual["runtime_hours"] = df_visual["cycle"]
+
+features = ["temperature", "vibration", "pressure", "humidity", "runtime_hours"]
+
+# --------------------------------------------
+# SENSOR DISTRIBUTIONS
+# --------------------------------------------
+
+for feature in features:
+    plt.figure()
+    sns.histplot(df_visual[feature], kde=True)
+    plt.title(f"{feature} Distribution")
+    plt.savefig(f"images/{feature}_distribution.png")
+    plt.close()
+
+print("✅ Sensor distribution plots saved")
+
+
+# --------------------------------------------
+# FAILURE DISTRIBUTION
+# --------------------------------------------
+
+plt.figure()
+sns.countplot(x="failure", data=df_visual)
+plt.title("Failure vs Non-Failure")
+plt.savefig("images/failure_distribution.png")
+plt.close()
+
+print("✅ Failure distribution saved")
+
+
+# --------------------------------------------
+# CORRELATION HEATMAP
+# --------------------------------------------
+
+plt.figure(figsize=(10, 8))
+sns.heatmap(df_visual.corr(), cmap="coolwarm")
+plt.title("Correlation Heatmap")
+plt.savefig("images/correlation_heatmap.png")
+plt.close()
+
+print("✅ Correlation heatmap saved")
+
+
+# ============================================
+# REAL-TIME PREDICTION
+# ============================================
+
+def predict_machine_status(input_data):
+    input_df = pd.DataFrame([input_data], columns=X.columns)
+    input_scaled = scaler.transform(input_df)
+    prediction = model.predict(input_scaled)[0]
+
+    if prediction == 0:
+        print("\n✅ Machine is Healthy")
+    else:
+        print("\n🚨 ALERT: Machine Failure Likely!")
+
+    return prediction
+
+
+print("\n🔧 Testing Real-Time Prediction...")
+
+sample_input = X.iloc[0].values.tolist()
+predict_machine_status(sample_input)
+
+
+# ============================================
+# FINAL MESSAGE
+# ============================================
+
+print("\n🎉 FULL PROJECT COMPLETED WITH NASA DATA 🚀")

@@ -1,45 +1,60 @@
-#  AI-Powered Predictive Maintenance System for IoT Devices
+#  AI-Powered Predictive Maintenance System (NASA Dataset)
 
 ##  Overview
-This project predicts machine failures using IoT sensor data and machine learning techniques.
+This project is an AI-based predictive maintenance system that uses machine learning to predict machine failures using real industrial data.
+
+It leverages the NASA Turbofan Engine Degradation Simulation dataset to simulate real-world IoT sensor behavior.
+
+---
 
 ##  Problem Statement
 Unexpected machine failures in industries lead to:
-- Downtime
-- High repair costs
+- High downtime
+- Expensive repairs
 - Production loss
 
-##  Solution
-An AI-based predictive maintenance system that:
-- Analyzes sensor data
-- Predicts machine failure
-- Generates alerts
+---
 
-##  Industry Applications
-- Manufacturing
-- Automotive
-- Power Plants
-- Aviation
+##  Solution
+This system:
+- Processes sensor data
+- Predicts machine failure
+- Provides real-time predictions via a web dashboard
+
+---
+
+##  Dataset
+- NASA CMAPSS Turbofan Dataset
+- Converted Remaining Useful Life (RUL) into binary failure classification
+
+---
 
 ##  Tech Stack
 - Python
 - Pandas, NumPy
 - Scikit-learn
 - Matplotlib, Seaborn
+- Streamlit
+
+---
 
 ##  Features
-- Sensor data simulation
-- Machine failure prediction
-- Real-time prediction system
-- Data visualization
-- Model evaluation
+- Real-world dataset integration (NASA)
+- Data preprocessing & feature engineering
+- Machine learning model (Random Forest)
+- Model evaluation (accuracy, confusion matrix)
+- Visualization of sensor data
+- Interactive Streamlit dashboard
 
-##  Project Structure
+---
 
+##  Streamlit Dashboard
 
-##  Installation
+Run the app:
+
 ```bash
-pip install -r requirements.txt
+streamlit run app.py
+
 
 Author
 
